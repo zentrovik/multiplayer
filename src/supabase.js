@@ -6,7 +6,13 @@ const supabaseAnonKey =
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   ''
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null
+
+if (!supabase) {
+  console.warn('Supabase is not configured. Guest mode will remain available.')
+}
 
 export const RANK_TIERS = [
   { rank: 'E', minExp: 0, nextExp: 250 },
@@ -29,7 +35,7 @@ export function calculateRankFromExp(exp = 0) {
 }
 
 export async function getOrCreateProfile(user) {
-  if (!user || user.isGuest) return null
+  if (!supabase || !user || user.isGuest) return null
 
   const userId = String(user.uid || user.id)
   if (!userId) return null
@@ -78,7 +84,7 @@ export async function getOrCreateProfile(user) {
 }
 
 export async function getUserProfile(userId) {
-  if (!userId) return null
+  if (!supabase || !userId) return null
 
   try {
     const { data, error } = await supabase
@@ -100,7 +106,7 @@ export async function getUserProfile(userId) {
 }
 
 export async function updateProfileStats(userId, updates = {}) {
-  if (!userId) return null
+  if (!supabase || !userId) return null
 
   try {
     const { data, error } = await supabase
