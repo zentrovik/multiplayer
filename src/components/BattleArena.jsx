@@ -231,7 +231,13 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
 
     setMatchmakingSeconds(15);
     const timer = setInterval(() => {
-      setMatchmakingSeconds((seconds) => Math.max(0, seconds - 1));
+      setMatchmakingSeconds((seconds) => {
+        if (seconds <= 1) {
+          socketRef.current?.emit('request_bot_matchmaking');
+          return 0;
+        }
+        return seconds - 1;
+      });
     }, 1000);
 
     return () => clearInterval(timer);

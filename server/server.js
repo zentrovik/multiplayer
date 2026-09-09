@@ -467,6 +467,12 @@ io.on('connection', (socket) => {
     }
   })
 
+  // The client requests the fallback exactly when its visible countdown reaches zero.
+  // Queue removal makes this safe alongside the server-side timeout.
+  socket.on('request_bot_matchmaking', async () => {
+    await handleBotMatchmaking(socket.id)
+  })
+
   // 2. Submit Challenge Word
   socket.on('submit_challenge', ({ roomId, word }) => {
     const targetRoomId = roomId || socket.data?.roomId
