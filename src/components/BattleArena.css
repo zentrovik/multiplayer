@@ -1744,6 +1744,109 @@
     width: 52px;
   }
 
+  .banner-clash-screen {
+    min-height: 100dvh;
+    padding: max(12px, env(safe-area-inset-top)) 8px max(12px, env(safe-area-inset-bottom));
+  }
+
+  .banner-clash-container {
+    gap: 18px;
+    padding: 14px 0;
+  }
+
+  .cyber-clash-header {
+    gap: 8px;
+    max-width: 100%;
+  }
+
+  .cyber-sub-title {
+    font-size: clamp(15px, 5vw, 20px);
+    letter-spacing: 1.8px;
+    white-space: nowrap;
+  }
+
+  .cyber-match-badge {
+    padding: 5px 10px;
+    font-size: 10px;
+    letter-spacing: 1.2px;
+  }
+
+  .banner-duel-stage {
+    width: 100%;
+    padding: 0 4px;
+    align-items: flex-start;
+  }
+
+  .banner-fighter-column {
+    width: min(43vw, 154px);
+  }
+
+  .scroll-rod {
+    height: 22px;
+  }
+
+  .rod-bar {
+    height: 13px;
+  }
+
+  .rod-knob {
+    width: 22px;
+    height: 22px;
+  }
+
+  .scroll-cloth {
+    width: 88%;
+    padding: 5px;
+  }
+
+  .cloth-inner {
+    gap: 7px;
+    padding: 18px 7px 42px;
+  }
+
+  .banner-side-tag {
+    font-size: 11px;
+    letter-spacing: 0.8px;
+  }
+
+  .banner-avatar-frame {
+    width: clamp(48px, 16vw, 64px);
+    height: clamp(48px, 16vw, 64px);
+    border-width: 4px;
+  }
+
+  .banner-player-name {
+    width: 100%;
+    max-width: 100%;
+    font-size: clamp(10px, 3.2vw, 13px);
+  }
+
+  .banner-rank-tag {
+    padding: 4px 7px;
+    font-size: 10px;
+  }
+
+  .banner-vs-center {
+    width: 62px;
+    height: 62px;
+    top: 48%;
+  }
+
+  .vs-emblem-text {
+    font-size: 48px;
+    letter-spacing: -3px;
+  }
+
+  .vs-flash-flare {
+    width: 82px;
+    height: 82px;
+  }
+
+  .vs-spark-glow {
+    width: 135%;
+    height: 3px;
+  }
+
   .self-avatar-wrap {
     width: 36px;
     height: 36px;
