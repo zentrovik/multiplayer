@@ -214,6 +214,8 @@ async function createRoom(p1, p2, isBot = false) {
   const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
   const s1 = io.sockets.sockets.get(p1.socketId)
   const s2 = isBot ? null : io.sockets.sockets.get(p2.socketId)
+  const attacker = isBot && Math.random() < 0.5 ? p2 : p1
+  const defender = attacker === p1 ? p2 : p1
 
   // Deduct/Lock wagers atomically via Supabase
   const { error: rpcError } = await supabase.rpc('start_gem_battle', {
@@ -235,8 +237,8 @@ async function createRoom(p1, p2, isBot = false) {
     isBot,
     p1: { id: p1.userId, name: p1.username, photoURL: p1.photoURL || '', socketId: p1.socketId, rank: p1.rank || 'E' },
     p2: { id: p2.userId, name: p2.username, photoURL: p2.photoURL || '', socketId: p2.socketId, rank: p2.rank || 'E' },
-    attackerId: p1.userId,
-    defenderId: p2.userId,
+    attackerId: attacker.userId,
+    defenderId: defender.userId,
     currentWord: '',
     r1Word: '',
     r1Guess: '',
@@ -264,12 +266,19 @@ async function createRoom(p1, p2, isBot = false) {
     round: 1,
     p1: { id: p1.userId, name: p1.username, photoURL: p1.photoURL || '', rank: p1.rank || 'E' },
     p2: { id: p2.userId, name: p2.username, photoURL: p2.photoURL || '', rank: p2.rank || 'E' },
-    attackerId: p1.userId,
-    defenderId: p2.userId
+    attackerId: attacker.userId,
+    defenderId: defender.userId
   }
 
   if (s1) s1.emit('match_found', matchPayload)
   if (s2) s2.emit('match_found', matchPayload)
+
+  if (isBot && attacker.userId === 'BOT_OPPONENT') {
+    setTimeout(() => {
+      const room = activeRooms.get(roomId)
+      if (room && !room.isSettled) triggerBotAttack(room)
+    }, 6000)
+  }
 }
 
 async function finalizeSymmetricMatch(room) {
@@ -373,12 +382,16 @@ function triggerBotDefend(room, challengeWord) {
     const guess = isCorrect ? challengeWord : generateHumanTypo(challengeWord)
 
     room.r1Guess = guess
-    room.p2DefendedSuccess = isCorrect
+    if (room.p1.id === room.defenderId) {
+      room.p1DefendedSuccess = isCorrect
+    } else {
+      room.p2DefendedSuccess = isCorrect
+    }
 
-    // Switch roles for Round 2 (Bot becomes Attacker, Human becomes Defender)
+    // Switch roles for Round 2.
     room.round = 2
-    room.attackerId = room.p2.id
-    room.defenderId = room.p1.id
+    room.attackerId = room.p1.id === room.attackerId ? room.p2.id : room.p1.id
+    room.defenderId = room.p1.id === room.attackerId ? room.p2.id : room.p1.id
     room.currentWord = ''
 
     io.to(room.roomId).emit('round_transition', {
@@ -525,11 +538,15 @@ io.on('connection', (socket) => {
 
     if (room.round === 1) {
       room.r1Guess = sanitizedGuess
-      room.p2DefendedSuccess = isCorrect
+      if (room.p1.id === room.defenderId) {
+        room.p1DefendedSuccess = isCorrect
+      } else {
+        room.p2DefendedSuccess = isCorrect
+      }
 
       room.round = 2
-      room.attackerId = room.p2.id
-      room.defenderId = room.p1.id
+      room.attackerId = room.p1.id === room.attackerId ? room.p2.id : room.p1.id
+      room.defenderId = room.p1.id === room.attackerId ? room.p2.id : room.p1.id
       room.currentWord = ''
 
       io.to(room.roomId).emit('round_transition', {

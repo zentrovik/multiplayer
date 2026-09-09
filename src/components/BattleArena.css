@@ -184,6 +184,19 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
 }
 
+.cyber-opening-status {
+  padding: 4px 10px;
+  border: 1px solid rgba(250, 204, 21, 0.55);
+  border-radius: 999px;
+  background: rgba(120, 53, 15, 0.42);
+  color: #fef08a;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-align: center;
+  text-shadow: 0 0 8px rgba(250, 204, 21, 0.45);
+}
+
 .banner-duel-stage {
   position: relative;
   width: 100%;
@@ -1140,6 +1153,29 @@
   animation: radarPulse 1.8s infinite ease-out;
 }
 
+.matchmaking-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 16px;
+  padding: 7px 12px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.matchmaking-status strong {
+  min-width: 24px;
+  color: #facc15;
+  font-size: 14px;
+  text-align: right;
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.55);
+}
+
 /* ==========================================================================
    10. REDESIGNED RESULT SCREEN WITH PROFILES AND RANKS
    ========================================================================== */
@@ -1769,6 +1805,11 @@
     padding: 5px 10px;
     font-size: 10px;
     letter-spacing: 1.2px;
+  }
+
+  .cyber-opening-status {
+    font-size: 8px;
+    letter-spacing: 0.7px;
   }
 
   .banner-duel-stage {
