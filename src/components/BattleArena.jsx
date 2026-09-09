@@ -306,7 +306,6 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
           <h2 className="arena-title">MATCHMAKING...</h2>
           <p className="arena-desc">Searching for an online opponent</p>
           <div className="matchmaking-status" aria-live="polite">
-            <span className="matchmaking-status-label">MATCH STARTS IN</span>
             <strong>{matchmakingSeconds}s</strong>
           </div>
           <button type="button" onClick={onExit} className="arena-btn-cancel">CANCEL</button>

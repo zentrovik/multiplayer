@@ -214,8 +214,8 @@ async function createRoom(p1, p2, isBot = false) {
   const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
   const s1 = io.sockets.sockets.get(p1.socketId)
   const s2 = isBot ? null : io.sockets.sockets.get(p2.socketId)
-  const attacker = isBot && Math.random() < 0.5 ? p2 : p1
-  const defender = attacker === p1 ? p2 : p1
+  const attacker = p1
+  const defender = p2
 
   // Deduct/Lock wagers atomically via Supabase
   const { error: rpcError } = await supabase.rpc('start_gem_battle', {
@@ -273,12 +273,6 @@ async function createRoom(p1, p2, isBot = false) {
   if (s1) s1.emit('match_found', matchPayload)
   if (s2) s2.emit('match_found', matchPayload)
 
-  if (isBot && attacker.userId === 'BOT_OPPONENT') {
-    setTimeout(() => {
-      const room = activeRooms.get(roomId)
-      if (room && !room.isSettled) triggerBotAttack(room)
-    }, 6000)
-  }
 }
 
 async function finalizeSymmetricMatch(room) {
@@ -388,17 +382,17 @@ function triggerBotDefend(room, challengeWord) {
       room.p2DefendedSuccess = isCorrect
     }
 
-    // Switch roles for Round 2.
+    // The bot always attacks in Round 2 after defending Round 1.
     room.round = 2
-    room.attackerId = room.p1.id === room.attackerId ? room.p2.id : room.p1.id
-    room.defenderId = room.p1.id === room.attackerId ? room.p2.id : room.p1.id
+    room.attackerId = room.p2.id
+    room.defenderId = room.p1.id
     room.currentWord = ''
 
     io.to(room.roomId).emit('round_transition', {
       roomId: room.roomId,
       round: 2,
-      attackerId: room.p2.id,
-      defenderId: room.p1.id,
+      attackerId: room.attackerId,
+      defenderId: room.defenderId,
       lastWasCorrect: isCorrect
     })
 
@@ -544,21 +538,26 @@ io.on('connection', (socket) => {
         room.p2DefendedSuccess = isCorrect
       }
 
+      // The bot always attacks in Round 2 after defending Round 1.
       room.round = 2
-      room.attackerId = room.p1.id === room.attackerId ? room.p2.id : room.p1.id
-      room.defenderId = room.p1.id === room.attackerId ? room.p2.id : room.p1.id
+      room.attackerId = room.p2.id
+      room.defenderId = room.p1.id
       room.currentWord = ''
 
       io.to(room.roomId).emit('round_transition', {
         roomId: room.roomId,
         round: 2,
-        attackerId: room.p2.id,
-        defenderId: room.p1.id,
+        attackerId: room.attackerId,
+        defenderId: room.defenderId,
         lastWasCorrect: isCorrect
       })
     } else {
       room.r2Guess = sanitizedGuess
-      room.p1DefendedSuccess = isCorrect
+      if (room.p1.id === room.defenderId) {
+        room.p1DefendedSuccess = isCorrect
+      } else {
+        room.p2DefendedSuccess = isCorrect
+      }
       await finalizeSymmetricMatch(room)
     }
   })
