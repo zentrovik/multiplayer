@@ -25,6 +25,7 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
   const [errorMsg, setErrorMsg] = useState('');
   const [startCountdown, setStartCountdown] = useState(3);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [matchmakingSeconds, setMatchmakingSeconds] = useState(15);
 
   // Dynamic Spelling Engine State
   const [isTypo, setIsTypo] = useState(false);
@@ -225,6 +226,17 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
     }
   }, [stage, startCountdown]);
 
+  useEffect(() => {
+    if (stage !== 'searching') return undefined;
+
+    setMatchmakingSeconds(15);
+    const timer = setInterval(() => {
+      setMatchmakingSeconds((seconds) => Math.max(0, seconds - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [stage]);
+
   const handlePlayAudio = (word, isSlow = false) => {
     if (!word) return;
     setIsPlayingAudio(true);
@@ -293,6 +305,10 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
           <div className="search-pulse"></div>
           <h2 className="arena-title">MATCHMAKING...</h2>
           <p className="arena-desc">Searching for an online opponent</p>
+          <div className="matchmaking-status" aria-live="polite">
+            <span className="matchmaking-status-label">MATCH STARTS IN</span>
+            <strong>{matchmakingSeconds}s</strong>
+          </div>
           <button type="button" onClick={onExit} className="arena-btn-cancel">CANCEL</button>
         </div>
       </div>
@@ -316,6 +332,9 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
           <div className="cyber-clash-header">
             <span className="cyber-sub-title">RANKED ARENA DUEL</span>
             <div className="cyber-match-badge">MATCH #01 • 20 💎 POT</div>
+            <div className="cyber-opening-status">
+              {isAttacker ? 'YOU SEND THE FIRST WORD' : 'OPPONENT SENDS FIRST'}
+            </div>
           </div>
 
           <div className="banner-duel-stage">
