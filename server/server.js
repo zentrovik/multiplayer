@@ -40,6 +40,15 @@ const WAGER_GEMS = 10
 const MATCH_TIMEOUT_MS = 15000 // 15-second matchmaking limit
 const BOT_RESPONSE_MIN_MS = 9500
 const BOT_RESPONSE_VARIATION_MS = 2000
+const RANK_TIERS = [
+  { rank: 'E', minExp: 0 },
+  { rank: 'D', minExp: 250 },
+  { rank: 'C', minExp: 500 },
+  { rank: 'B', minExp: 750 },
+  { rank: 'A', minExp: 1000 },
+  { rank: 'S', minExp: 1500 },
+  { rank: 'God Mode', minExp: 2000 }
+]
 let matchmakingQueue = []
 const activeRooms = new Map()
 let isMatching = false
@@ -96,6 +105,14 @@ function getRandomBotIdentity() {
 
 function getRandomBotWord() {
   return botWordPool[Math.floor(Math.random() * botWordPool.length)]
+}
+
+function calculateRankFromExp(exp = 0) {
+  const currentExp = Number(exp) || 0
+  for (let index = RANK_TIERS.length - 1; index >= 0; index -= 1) {
+    if (currentExp >= RANK_TIERS[index].minExp) return RANK_TIERS[index].rank
+  }
+  return 'E'
 }
 
 function generateHumanTypo(word) {
@@ -436,7 +453,7 @@ io.on('connection', (socket) => {
     try {
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('gems')
+        .select('gems, exp')
         .eq('id', cleanUserId)
         .single()
 
@@ -450,7 +467,7 @@ io.on('connection', (socket) => {
         userId: cleanUserId,
         username: socket.data.username,
         photoURL: socket.data.photoURL,
-        rank: socket.data.rank
+        rank: calculateRankFromExp(profile.exp)
       })
       socket.emit('matchmaking_started', { seconds: MATCH_TIMEOUT_MS / 1000 })
     } catch (err) {

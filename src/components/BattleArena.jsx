@@ -4,6 +4,7 @@ import { createGameSocket } from '../utils/socket';
 import { playHDVoice } from '../utils/voiceEngine';
 import { playMatchStartSound, playWinSound, playLossSound, playClickSound } from '../utils/soundFX';
 import { initSpellingEngine, checkWordSpelling } from '../utils/spellingEngine';
+import { calculateRankFromExp } from '../supabase';
 import './BattleArena.css';
 
 const profanityFilter = new Filter();
@@ -44,7 +45,7 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
 
   const myId = String(user?.uid || user?.id || '').trim();
   const myPhoto = user?.photoURL || gameProfile?.avatar_url || gameProfile?.photoURL || '';
-  const myRank = gameProfile?.rank || 'E';
+  const myRank = calculateRankFromExp(gameProfile?.exp ?? 0);
   const isAttacker = String(matchData?.attackerId || '').trim() === myId;
   const canSuggest = isAttacker && stage === 'playing';
 
