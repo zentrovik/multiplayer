@@ -36,6 +36,7 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
   const socketRef = useRef(null);
   const matchDataRef = useRef(null);
   const matchFoundRef = useRef(false);
+  const botRequestTimerRef = useRef(null);
 
   useEffect(() => {
     matchDataRef.current = matchData;
@@ -126,6 +127,10 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       if (p1Id !== myId && p2Id !== myId) return;
 
       matchFoundRef.current = true;
+      if (botRequestTimerRef.current) {
+        clearInterval(botRequestTimerRef.current);
+        botRequestTimerRef.current = null;
+      }
       setMatchData(data);
       setRound(data.round);
       setStage('clash');
@@ -185,6 +190,10 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       setMatchmakingSeconds(15);
     };
 
+    const handleDisconnect = () => {
+      setMatchmakingReady(false);
+    };
+
     const joinMatchmaking = () => {
       if (matchFoundRef.current) return;
 
@@ -204,12 +213,14 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
     socket.on('match_error', handleMatchError);
 
     socket.on('connect', joinMatchmaking);
+    socket.on('disconnect', handleDisconnect);
     socket.connect();
 
     return () => {
       socket.off('match_found', handleMatchFound);
       socket.off('matchmaking_started', handleMatchmakingStarted);
       socket.off('connect', joinMatchmaking);
+      socket.off('disconnect', handleDisconnect);
       socket.off('challenge_active', handleChallengeActive);
       socket.off('round_transition', handleRoundTransition);
       socket.off('battle_finished', handleBattleFinished);
@@ -249,14 +260,27 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
     const timer = setInterval(() => {
       setMatchmakingSeconds((seconds) => {
         if (seconds <= 1) {
-          socketRef.current?.emit('request_bot_matchmaking');
+          if (!botRequestTimerRef.current) {
+            const requestBotMatch = () => {
+              if (matchFoundRef.current) return;
+              socketRef.current?.emit('request_bot_matchmaking');
+            };
+            requestBotMatch();
+            botRequestTimerRef.current = setInterval(requestBotMatch, 2000);
+          }
           return 0;
         }
         return seconds - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (botRequestTimerRef.current) {
+        clearInterval(botRequestTimerRef.current);
+        botRequestTimerRef.current = null;
+      }
+    };
   }, [stage, matchmakingReady]);
 
   const handlePlayAudio = (word, isSlow = false) => {
