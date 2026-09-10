@@ -26,6 +26,7 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
   const [startCountdown, setStartCountdown] = useState(3);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [matchmakingSeconds, setMatchmakingSeconds] = useState(15);
+  const [matchmakingReady, setMatchmakingReady] = useState(false);
 
   // Dynamic Spelling Engine State
   const [isTypo, setIsTypo] = useState(false);
@@ -34,6 +35,7 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
 
   const socketRef = useRef(null);
   const matchDataRef = useRef(null);
+  const matchFoundRef = useRef(false);
 
   useEffect(() => {
     matchDataRef.current = matchData;
@@ -123,6 +125,7 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
 
       if (p1Id !== myId && p2Id !== myId) return;
 
+      matchFoundRef.current = true;
       setMatchData(data);
       setRound(data.round);
       setStage('clash');
@@ -177,23 +180,36 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       setStage('error');
     };
 
+    const handleMatchmakingStarted = () => {
+      setMatchmakingReady(true);
+      setMatchmakingSeconds(15);
+    };
+
+    const joinMatchmaking = () => {
+      if (matchFoundRef.current) return;
+
+      socket.emit('join_matchmaking', {
+        userId: myId,
+        username: gameProfile?.username || user?.displayName || 'Hunter',
+        photoURL: myPhoto,
+        rank: myRank
+      });
+    };
+
     socket.on('match_found', handleMatchFound);
+    socket.on('matchmaking_started', handleMatchmakingStarted);
     socket.on('challenge_active', handleChallengeActive);
     socket.on('round_transition', handleRoundTransition);
     socket.on('battle_finished', handleBattleFinished);
     socket.on('match_error', handleMatchError);
 
+    socket.on('connect', joinMatchmaking);
     socket.connect();
-
-    socket.emit('join_matchmaking', {
-      userId: myId,
-      username: gameProfile?.username || user?.displayName || 'Hunter',
-      photoURL: myPhoto,
-      rank: myRank
-    });
 
     return () => {
       socket.off('match_found', handleMatchFound);
+      socket.off('matchmaking_started', handleMatchmakingStarted);
+      socket.off('connect', joinMatchmaking);
       socket.off('challenge_active', handleChallengeActive);
       socket.off('round_transition', handleRoundTransition);
       socket.off('battle_finished', handleBattleFinished);
@@ -227,7 +243,7 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
   }, [stage, startCountdown]);
 
   useEffect(() => {
-    if (stage !== 'searching') return undefined;
+    if (stage !== 'searching' || !matchmakingReady) return undefined;
 
     setMatchmakingSeconds(15);
     const timer = setInterval(() => {
@@ -241,7 +257,7 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [stage]);
+  }, [stage, matchmakingReady]);
 
   const handlePlayAudio = (word, isSlow = false) => {
     if (!word) return;

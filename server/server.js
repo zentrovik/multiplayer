@@ -99,25 +99,16 @@ function getRandomBotWord() {
 }
 
 function generateHumanTypo(word) {
-  if (!word || word.length < 3) return word + 'e'
-  const typoType = Math.floor(Math.random() * 3)
+  if (!word) return 'wrong'
 
-  if (typoType === 0) {
-    // Swap two adjacent letters
-    const idx = Math.floor(Math.random() * (word.length - 1))
-    return word.slice(0, idx) + word[idx + 1] + word[idx] + word.slice(idx + 2)
-  } else if (typoType === 1) {
-    // Drop a letter
-    const idx = Math.floor(Math.random() * word.length)
-    return word.slice(0, idx) + word.slice(idx + 1)
-  } else {
-    // Phonetic/common letter swap
-    if (word.includes('c')) return word.replace('c', 'k')
-    if (word.includes('ph')) return word.replace('ph', 'f')
-    if (word.includes('ee')) return word.replace('ee', 'ea')
-    if (word.includes('m')) return word.replace('m', 'n')
-    return word.slice(0, -1)
-  }
+  const typoOptions = [
+    `${word}x`,
+    `${word.slice(0, -1)}${word.slice(-1) === 'a' ? 'e' : 'a'}`,
+    word.length > 2 ? word.slice(0, -1) : `${word}x`,
+    word.length > 2 ? `${word[0]}${word.slice(2)}${word[1]}` : `${word}x`
+  ]
+  const typo = typoOptions[Math.floor(Math.random() * typoOptions.length)]
+  return typo === word ? `${word}x` : typo
 }
 
 // --------------------------------------------------------------------------
@@ -461,6 +452,7 @@ io.on('connection', (socket) => {
         photoURL: socket.data.photoURL,
         rank: socket.data.rank
       })
+      socket.emit('matchmaking_started', { seconds: MATCH_TIMEOUT_MS / 1000 })
     } catch (err) {
       console.error('[Matchmaking Error]:', err)
       socket.emit('match_error', 'Error during matchmaking.')
