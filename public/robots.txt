@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://plydrop.in/sitemap.xml
+Sitemap: https://rankex.space/sitemap.xml
