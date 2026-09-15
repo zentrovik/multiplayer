@@ -38,6 +38,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 const WAGER_GEMS = 10
 const MATCH_TIMEOUT_MS = 15000 // 15-second matchmaking limit
+const WORD_SELECTION_LIMIT_MS = 30000
+const ANSWER_TYPING_LIMIT_MS = 30000
 const BOT_RESPONSE_MIN_MS = 9500
 const BOT_RESPONSE_VARIATION_MS = 2000
 const RANK_TIERS = [
@@ -52,6 +54,150 @@ const RANK_TIERS = [
 let matchmakingQueue = []
 const activeRooms = new Map()
 let isMatching = false
+
+function emitTurnState(room) {
+  if (!room || !room.roomId || !room.turnType || !room.turnDeadlineAt) return
+
+  const remainingSeconds = Math.max(0, Math.ceil(Math.max(room.turnDeadlineAt - Date.now(), 0) / 1000))
+
+  io.to(room.roomId).emit('turn_timer', {
+    roomId: room.roomId,
+    turnType: room.turnType,
+    attackerId: room.attackerId,
+    defenderId: room.defenderId,
+    round: room.round,
+    secondsRemaining: remainingSeconds,
+    deadlineAt: room.turnDeadlineAt
+  })
+}
+
+function startChallengeTurn(room) {
+  if (!room) return
+
+  room.turnType = 'challenge'
+  room.turnDeadlineAt = Date.now() + WORD_SELECTION_LIMIT_MS
+  room.turnPenaltyApplied = false
+  emitTurnState(room)
+}
+
+function startAnswerTurn(room) {
+  if (!room) return
+
+  room.turnType = 'answer'
+  room.turnDeadlineAt = Date.now() + ANSWER_TYPING_LIMIT_MS
+  room.turnPenaltyApplied = false
+  emitTurnState(room)
+}
+
+async function applyGemPenalty(room, userId, turnType, penaltyGems) {
+  if (!room || !userId) return
+
+  const penaltyValue = Number(penaltyGems) || 0
+  const expiredPlayerId = String(userId).trim()
+  const participantIds = [expiredPlayerId]
+  const penaltyMap = {}
+
+  penaltyMap[expiredPlayerId] = penaltyValue
+
+  try {
+    for (const participantId of participantIds) {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('gems')
+        .eq('id', participantId)
+        .single()
+
+      if (error || !profile) {
+        console.warn('[Penalty] Unable to load profile for penalty:', participantId, error?.message)
+        continue
+      }
+
+      const currentGems = Number(profile.gems || 0)
+      const nextGems = Math.max(0, currentGems + penaltyValue)
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ gems: nextGems })
+        .eq('id', participantId)
+
+      if (updateError) {
+        console.error('[Penalty] Failed to update profile gems:', updateError.message)
+      }
+    }
+
+    const timeoutPayload = {
+      roomId: room.roomId,
+      turnType,
+      userId: String(userId).trim(),
+      penaltyGems: penaltyValue,
+      penalties: penaltyMap,
+      secondsRemaining: 0,
+      deadlineAt: room.turnDeadlineAt
+    }
+
+    const expiredPlayer = [room.p1, room.p2].find(
+      (player) => String(player?.id || '').trim() === expiredPlayerId
+    )
+    const opponentPlayer = [room.p1, room.p2].find(
+      (player) => String(player?.id || '').trim() !== expiredPlayerId
+    )
+
+    const expiredSocket = io.sockets.sockets.get(expiredPlayer?.socketId)
+    const opponentSocket = io.sockets.sockets.get(opponentPlayer?.socketId)
+
+    if (expiredSocket) {
+      expiredSocket.emit('turn_timeout', {
+        ...timeoutPayload,
+        message: turnType === 'challenge'
+          ? 'TIME UP! You lost 5 Gems because your 30s word selection timer expired.'
+          : 'TIME UP! You lost 10 Gems because your 30s answer timer expired.'
+      })
+    }
+
+    if (opponentSocket) {
+      opponentSocket.emit('turn_timeout', {
+        ...timeoutPayload,
+        message: turnType === 'challenge'
+          ? 'PLEASE WAIT! Your opponent\'s 30s word selection timer expired. You did not lose Gems.'
+          : 'PLEASE WAIT! Your opponent\'s 30s answer timer expired. You did not lose Gems.'
+      })
+    }
+  } catch (err) {
+    console.error('[Penalty] Failed to apply penalty:', err)
+  }
+}
+
+function findRoomForPlayer(userId) {
+  for (const room of activeRooms.values()) {
+    if (String(room.p1?.id || '').trim() === String(userId).trim() || String(room.p2?.id || '').trim() === String(userId).trim()) {
+      return room
+    }
+  }
+
+  return null
+}
+
+setInterval(() => {
+  const now = Date.now()
+
+  for (const room of activeRooms.values()) {
+    if (!room || room.isSettled || !room.turnType || !room.turnDeadlineAt) continue
+
+    if (now >= room.turnDeadlineAt) {
+      if (room.turnType === 'challenge' && !room.turnPenaltyApplied) {
+        room.turnPenaltyApplied = true
+        applyGemPenalty(room, room.attackerId, 'challenge', -5)
+      }
+
+      if (room.turnType === 'answer' && !room.turnPenaltyApplied) {
+        room.turnPenaltyApplied = true
+        applyGemPenalty(room, room.defenderId, 'answer', -10)
+      }
+    }
+
+    emitTurnState(room)
+  }
+}, 1000)
 
 // --------------------------------------------------------------------------
 // 1. DATASET & BOT ASSET LOADERS
@@ -255,6 +401,10 @@ async function createRoom(p1, p2, isBot = false) {
     p1DefendedSuccess: false,
     p2DefendedSuccess: false,
     isSettled: false,
+    turnType: 'challenge',
+    turnDeadlineAt: null,
+    initialTurnStarted: false,
+    turnPenaltyApplied: false,
     botActionTimer: null
   }
 
@@ -281,6 +431,7 @@ async function createRoom(p1, p2, isBot = false) {
   if (s1) s1.emit('match_found', matchPayload)
   if (s2) s2.emit('match_found', matchPayload)
 
+  emitTurnState(roomState)
 }
 
 async function finalizeSymmetricMatch(room) {
@@ -404,6 +555,8 @@ function triggerBotDefend(room, challengeWord) {
       lastWasCorrect: isCorrect
     })
 
+    startChallengeTurn(room)
+
     // Trigger Bot's attack turn
     triggerBotAttack(room)
   }, simulatedDelay)
@@ -482,6 +635,17 @@ io.on('connection', (socket) => {
     await handleBotMatchmaking(socket.id)
   })
 
+  socket.on('start_initial_turn', ({ roomId }) => {
+    const room = activeRooms.get(roomId || socket.data?.roomId)
+    if (!room || room.isSettled || room.initialTurnStarted) return
+
+    const senderId = String(socket.data?.userId || '').trim()
+    if (senderId !== String(room.attackerId || '').trim()) return
+
+    room.initialTurnStarted = true
+    startChallengeTurn(room)
+  })
+
   // 2. Submit Challenge Word
   socket.on('submit_challenge', ({ roomId, word }) => {
     const targetRoomId = roomId || socket.data?.roomId
@@ -520,6 +684,8 @@ io.on('connection', (socket) => {
       defenderId: room.defenderId,
       round: room.round
     })
+
+    startAnswerTurn(room)
 
     // If opponent is a bot and is defending in Round 1
     if (room.isBot && room.defenderId === 'BOT_OPPONENT') {
@@ -566,6 +732,8 @@ io.on('connection', (socket) => {
         defenderId: room.defenderId,
         lastWasCorrect: isCorrect
       })
+
+      startChallengeTurn(room)
     } else {
       room.r2Guess = sanitizedGuess
       if (room.p1.id === room.defenderId) {
@@ -574,6 +742,54 @@ io.on('connection', (socket) => {
         room.p2DefendedSuccess = isCorrect
       }
       await finalizeSymmetricMatch(room)
+    }
+  })
+
+  // Restore an active room after a refresh.
+  socket.on('restore_room', async ({ userId }) => {
+    const cleanUserId = String(userId || '').trim()
+    const room = findRoomForPlayer(cleanUserId)
+    if (!room || room.isSettled) return
+
+    socket.data.userId = cleanUserId
+    socket.data.roomId = room.roomId
+    if (String(room.p1?.id || '').trim() === cleanUserId) {
+      room.p1.socketId = socket.id
+    } else if (String(room.p2?.id || '').trim() === cleanUserId) {
+      room.p2.socketId = socket.id
+    }
+    socket.join(room.roomId)
+
+    const p1 = room.p1
+    const p2 = room.p2
+    const payload = {
+      roomId: room.roomId,
+      round: room.round,
+      p1: { id: p1.id, name: p1.name, photoURL: p1.photoURL, rank: p1.rank },
+      p2: { id: p2.id, name: p2.name, photoURL: p2.photoURL, rank: p2.rank },
+      attackerId: room.attackerId,
+      defenderId: room.defenderId
+    }
+
+    socket.emit('match_found', payload)
+    socket.emit('turn_timer', {
+      roomId: room.roomId,
+      turnType: room.turnType,
+      attackerId: room.attackerId,
+      defenderId: room.defenderId,
+      round: room.round,
+      secondsRemaining: Math.max(0, Math.ceil(Math.max(room.turnDeadlineAt - Date.now(), 0) / 1000)),
+      deadlineAt: room.turnDeadlineAt
+    })
+
+    if (room.turnType === 'answer' && room.currentWord) {
+      socket.emit('challenge_active', {
+        roomId: room.roomId,
+        wordForTTS: room.currentWord,
+        attackerId: room.attackerId,
+        defenderId: room.defenderId,
+        round: room.round
+      })
     }
   })
 

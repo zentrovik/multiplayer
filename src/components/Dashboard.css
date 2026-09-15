@@ -306,6 +306,36 @@
   box-shadow: 0 1px 0 #14532d;
 }
 
+.space-bug-report-btn {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 60%, #075985 100%);
+  border: 2px solid #0f172a;
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 #0f172a, 0 0 10px rgba(56, 189, 248, 0.3);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  line-height: 1;
+}
+
+.space-bug-report-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #0f172a;
+}
+
+.space-bug-report-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Arial Black', 'Lilita One', system-ui, sans-serif;
+}
+
 /* ==========================================================================
    HERO / AVATAR STAGE
    ========================================================================== */
@@ -718,6 +748,27 @@
 .ad-watch-btn:active {
   transform: translateY(2px);
   box-shadow: 0 1.5px 0 #854d0e;
+}
+
+.bug-report-modal-sheet {
+  max-width: 360px;
+}
+
+.bug-reward-card {
+  border-color: #38bdf8;
+}
+
+.bug-email-text {
+  font-size: 18px;
+  color: #facc15;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-shadow: 0 0 8px rgba(250, 204, 21, 0.6);
+  word-break: break-word;
+}
+
+.bug-report-send-btn {
+  margin-top: 6px;
 }
 
 /* ==========================================================================

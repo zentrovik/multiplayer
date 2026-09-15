@@ -11,6 +11,7 @@ export default function Dashboard({ user, gameProfile, setGameProfile, onLogout 
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showGuestAlert, setShowGuestAlert] = useState(false)
   const [showAdModal, setShowAdModal] = useState(false)
+  const [showBugReportModal, setShowBugReportModal] = useState(false)
   const [inTestMatch, setInTestMatch] = useState(false)
   const [inBattleArena, setInBattleArena] = useState(false)
   const [inputName, setInputName] = useState('')
@@ -126,6 +127,17 @@ export default function Dashboard({ user, gameProfile, setGameProfile, onLogout 
     setAdProgress(0)
   }
 
+  const handleBugReportMail = () => {
+    playClickSound()
+    const bugEmail = 'zentrovik.team@gmail.com'
+    const subject = encodeURIComponent('Bug Finder Reward Proof')
+    const body = encodeURIComponent(
+      'Hello Zentrovik Team,\n\nI found a bug in the game and attached proof below.\n\nPlease verify the bug and reward the correct finder.\n\nBug Details:\n[Describe the bug]\n\nProof:\n[Attach screenshot, screen recording, or test steps]\n\nThanks,'
+    )
+    window.location.href = `mailto:${bugEmail}?subject=${subject}&body=${body}`
+    setShowBugReportModal(false)
+  }
+
   const handleVideoLoaded = (event) => {
     const duration = event.currentTarget.duration
     if (Number.isFinite(duration) && duration > 0) {
@@ -230,6 +242,14 @@ export default function Dashboard({ user, gameProfile, setGameProfile, onLogout 
               title="Recharge Gems"
             >
               +
+            </button>
+            <button
+              type="button"
+              className="space-bug-report-btn"
+              onClick={() => setShowBugReportModal(true)}
+              title="Bug Finder Reward"
+            >
+              <span className="space-bug-report-icon">?</span>
             </button>
           </div>
         </header>
@@ -554,6 +574,42 @@ export default function Dashboard({ user, gameProfile, setGameProfile, onLogout 
         )}
 
         {/* Guest Lock Alert */}
+        {showBugReportModal && (
+          <div className="space-modal-overlay" onClick={() => setShowBugReportModal(false)}>
+            <div className="space-modal-sheet ad-modal-sheet bug-report-modal-sheet" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => setShowBugReportModal(false)}
+                className="space-modal-close"
+              >
+                ✕
+              </button>
+
+              <div className="ad-modal-header">
+                <span className="ad-gem-large">⚡</span>
+                <h3 className="ad-modal-title">BUG FINDER REWARD</h3>
+                <p className="ad-modal-desc">
+                  Find the bug, send proof to the email below, and the team will verify the report and reward the correct finder.
+                </p>
+              </div>
+
+              <div className="ad-reward-card bug-reward-card">
+                <span className="ad-reward-label">REPORT EMAIL</span>
+                <span className="bug-email-text">zentrovik.team@gmail.com</span>
+                <span className="ad-reward-sub">SEND PROOF · VERIFY · BIG REWARD</span>
+              </div>
+
+              <button
+                type="button"
+                className="ad-watch-btn bug-report-send-btn"
+                onClick={handleBugReportMail}
+              >
+                SEND BUG REPORT
+              </button>
+            </div>
+          </div>
+        )}
+
         {showGuestAlert && (
           <div className="space-modal-overlay">
             <div className="space-modal-sheet space-alert-sheet">

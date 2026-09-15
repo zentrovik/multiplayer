@@ -28,6 +28,9 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [matchmakingSeconds, setMatchmakingSeconds] = useState(15);
   const [matchmakingReady, setMatchmakingReady] = useState(false);
+  const [turnType, setTurnType] = useState('challenge');
+  const [turnSeconds, setTurnSeconds] = useState(30);
+  const [turnMessage, setTurnMessage] = useState('');
 
   // Dynamic Spelling Engine State
   const [isTypo, setIsTypo] = useState(false);
@@ -134,6 +137,9 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       }
       setMatchData(data);
       setRound(data.round);
+      setTurnType('challenge');
+      setTurnSeconds(30);
+      setTurnMessage('');
       setStage('clash');
     };
 
@@ -141,6 +147,9 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       setActiveAudioWord(data.wordForTTS);
       setRound(data.round);
       setStage('solving');
+      setTurnType('answer');
+      setTurnSeconds(30);
+      setTurnMessage('');
 
       if (myId === String(data.defenderId).trim()) {
         handlePlayAudio(data.wordForTTS, true);
@@ -156,7 +165,52 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       setIsTypo(false);
       setSuggestions([]);
       setActiveAudioWord('');
+      setTurnType('challenge');
+      setTurnSeconds(30);
+      setTurnMessage('');
       setStage('playing');
+    };
+
+    const handleTurnTimer = (data) => {
+      if (!data || !data.roomId) return;
+
+      const remaining = Number(data.secondsRemaining ?? 0);
+      if (Number.isFinite(remaining)) {
+        setTurnSeconds(Math.max(0, remaining));
+      }
+
+      setTurnType(data.turnType || 'challenge');
+      if (turnMessage) {
+        const nextMessage = data.message || turnMessage;
+        if (nextMessage && nextMessage.includes('TIME UP')) {
+          setTurnMessage(nextMessage);
+        } else {
+          setTurnMessage('');
+        }
+      }
+    };
+
+    const handleTurnTimeout = (data) => {
+      if (!data || !data.roomId) return;
+
+      setTurnType(data.turnType || 'challenge');
+      setTurnSeconds(0);
+      setTurnMessage(data.message || (
+        String(data.userId || '').trim() === myId
+          ? 'TIME UP! You lost Gems because your timer expired.'
+          : 'PLEASE WAIT! Your opponent\'s timer expired. You did not lose Gems.'
+      ));
+
+      const myTimeoutPenalty = data.penalties && Object.prototype.hasOwnProperty.call(data.penalties, myId)
+        ? Number(data.penalties[myId])
+        : (String(data.userId || '').trim() === myId && Number.isFinite(Number(data.penaltyGems)) ? Number(data.penaltyGems) : 0);
+
+      if (Number.isFinite(myTimeoutPenalty) && setGameProfile) {
+        setGameProfile((prev) => ({
+          ...prev,
+          gems: Math.max(0, Number(prev?.gems || 0) + myTimeoutPenalty)
+        }));
+      }
     };
 
     const handleBattleFinished = (res) => {
@@ -206,26 +260,39 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       });
     };
 
+    const handleConnect = () => {
+      socket.emit('restore_room', { userId: myId });
+      window.setTimeout(() => {
+        if (!matchFoundRef.current) {
+          joinMatchmaking();
+        }
+      }, 250);
+    };
+
     socket.on('match_found', handleMatchFound);
     socket.on('matchmaking_started', handleMatchmakingStarted);
     socket.on('challenge_active', handleChallengeActive);
     socket.on('round_transition', handleRoundTransition);
     socket.on('battle_finished', handleBattleFinished);
     socket.on('match_error', handleMatchError);
+    socket.on('turn_timer', handleTurnTimer);
+    socket.on('turn_timeout', handleTurnTimeout);
 
-    socket.on('connect', joinMatchmaking);
+    socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.connect();
 
     return () => {
       socket.off('match_found', handleMatchFound);
       socket.off('matchmaking_started', handleMatchmakingStarted);
-      socket.off('connect', joinMatchmaking);
+      socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('challenge_active', handleChallengeActive);
       socket.off('round_transition', handleRoundTransition);
       socket.off('battle_finished', handleBattleFinished);
       socket.off('match_error', handleMatchError);
+      socket.off('turn_timer', handleTurnTimer);
+      socket.off('turn_timeout', handleTurnTimeout);
       socket.disconnect();
     };
   }, [myId, myPhoto, myRank, gameProfile?.username, user?.displayName, setGameProfile]);
@@ -251,8 +318,11 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       return () => clearTimeout(t);
     } else {
       setStage('playing');
+      socketRef.current?.emit('start_initial_turn', {
+        roomId: matchDataRef.current?.roomId || matchData?.roomId
+      });
     }
-  }, [stage, startCountdown]);
+  }, [stage, startCountdown, matchData]);
 
   useEffect(() => {
     if (stage !== 'searching' || !matchmakingReady) return undefined;
@@ -749,13 +819,30 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
 
         <p className="arena-instruction">
           {isAttacker
-            ? (stage === 'playing' ? 'Type a secret word for your opponent to spell' : 'Waiting for opponent to spell...')
-            : (stage === 'solving' ? 'Listen to HD pronunciation and spell the word' : 'Opponent is choosing a challenge word...')}
+            ? (stage === 'playing'
+                ? 'Type a secret word for your opponent to spell'
+                : 'Please wait for the opponent. If they miss the 30s timer, they lose 5 Gems for word selection or 10 Gems for answer time.')
+            : (stage === 'solving'
+                ? 'Listen to HD pronunciation and spell the word'
+                : 'Please wait for the opponent. If they miss the 30s timer, they lose 5 Gems for word selection or 10 Gems for answer time.')}
         </p>
+
+        <div className="arena-turn-timer" aria-live="polite">
+          <span className="turn-timer-label">
+            {turnType === 'challenge' ? 'WORD SELECTION' : 'ANSWER / TYPING'}
+          </span>
+          <span className="turn-timer-value">{turnSeconds}s</span>
+        </div>
 
         {errorMsg && (
           <div className="arena-error-banner">
             {errorMsg}
+          </div>
+        )}
+
+        {turnMessage && (
+          <div className="arena-turn-toast">
+            {turnMessage}
           </div>
         )}
 
