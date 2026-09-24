@@ -1,7 +1,8 @@
 {
-  "name": "lingobattles",
+  "name": "rankex",
   "private": true,
   "version": "0.1.0",
+  "description": "Rankex is an online word battle and spelling game with practice matches, ranked duels, Gem rewards, and EXP progression.",
   "type": "module",
   "scripts": {
     "dev": "vite",

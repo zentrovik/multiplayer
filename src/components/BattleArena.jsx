@@ -41,10 +41,16 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
   const matchDataRef = useRef(null);
   const matchFoundRef = useRef(false);
   const botRequestTimerRef = useRef(null);
+  const matchmakingDeadlineRef = useRef(0);
+  const stageRef = useRef(stage);
 
   useEffect(() => {
     matchDataRef.current = matchData;
   }, [matchData]);
+
+  useEffect(() => {
+    stageRef.current = stage;
+  }, [stage]);
 
   const myId = String(user?.uid || user?.id || '').trim();
   const myPhoto = user?.photoURL || gameProfile?.avatar_url || gameProfile?.photoURL || '';
@@ -193,17 +199,23 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
     const handleTurnTimeout = (data) => {
       if (!data || !data.roomId) return;
 
+      const expiredUserId = String(data.expiredUserId || data.userId || '').trim();
+      const isMeExpired = expiredUserId === myId;
+      const isBotTimeout = Boolean(data.isBotTimeout) || expiredUserId === 'BOT_OPPONENT';
+
       setTurnType(data.turnType || 'challenge');
       setTurnSeconds(0);
       setTurnMessage(data.message || (
-        String(data.userId || '').trim() === myId
-          ? 'TIME UP! You lost Gems because your timer expired.'
-          : 'PLEASE WAIT! Your opponent\'s timer expired. You did not lose Gems.'
+        isBotTimeout
+          ? 'TIME UP! The bot ran out of time. You did not lose Gems.'
+          : (isMeExpired
+            ? 'TIME UP! You lost Gems because your timer expired.'
+            : 'PLEASE WAIT! Your opponent\'s timer expired. You did not lose Gems.')
       ));
 
       const myTimeoutPenalty = data.penalties && Object.prototype.hasOwnProperty.call(data.penalties, myId)
         ? Number(data.penalties[myId])
-        : (String(data.userId || '').trim() === myId && Number.isFinite(Number(data.penaltyGems)) ? Number(data.penaltyGems) : 0);
+        : (isMeExpired && !isBotTimeout && Number.isFinite(Number(data.penaltyGems)) ? Number(data.penaltyGems) : 0);
 
       if (Number.isFinite(myTimeoutPenalty) && setGameProfile) {
         setGameProfile((prev) => ({
@@ -240,13 +252,16 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       setStage('error');
     };
 
-    const handleMatchmakingStarted = () => {
+    const handleMatchmakingStarted = (data = {}) => {
+      const seconds = Math.max(1, Number(data.seconds) || 15);
       setMatchmakingReady(true);
-      setMatchmakingSeconds(15);
+      matchmakingDeadlineRef.current = Date.now() + (seconds * 1000);
+      setMatchmakingSeconds(seconds);
     };
 
     const handleDisconnect = () => {
       setMatchmakingReady(false);
+      matchmakingDeadlineRef.current = 0;
     };
 
     const joinMatchmaking = () => {
@@ -269,6 +284,31 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       }, 250);
     };
 
+    const recoverAfterBackground = () => {
+      if (document.visibilityState === 'hidden') return;
+
+      if (!socket.connected) {
+        socket.connect();
+        return;
+      }
+
+      if (stageRef.current !== 'searching' || matchFoundRef.current) return;
+
+      if (botRequestTimerRef.current) {
+        clearInterval(botRequestTimerRef.current);
+        botRequestTimerRef.current = null;
+      }
+
+      setMatchmakingReady(false);
+      matchmakingDeadlineRef.current = 0;
+      socket.emit('restore_room', { userId: myId });
+      window.setTimeout(() => {
+        if (!matchFoundRef.current && socket.connected && stageRef.current === 'searching') {
+          joinMatchmaking();
+        }
+      }, 250);
+    };
+
     socket.on('match_found', handleMatchFound);
     socket.on('matchmaking_started', handleMatchmakingStarted);
     socket.on('challenge_active', handleChallengeActive);
@@ -280,6 +320,9 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
 
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
+    document.addEventListener('visibilitychange', recoverAfterBackground);
+    window.addEventListener('pageshow', recoverAfterBackground);
+    window.addEventListener('online', recoverAfterBackground);
     socket.connect();
 
     return () => {
@@ -287,6 +330,9 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
       socket.off('matchmaking_started', handleMatchmakingStarted);
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
+      document.removeEventListener('visibilitychange', recoverAfterBackground);
+      window.removeEventListener('pageshow', recoverAfterBackground);
+      window.removeEventListener('online', recoverAfterBackground);
       socket.off('challenge_active', handleChallengeActive);
       socket.off('round_transition', handleRoundTransition);
       socket.off('battle_finished', handleBattleFinished);
@@ -327,22 +373,26 @@ export default function BattleArena({ user, gameProfile, setGameProfile, onExit 
   useEffect(() => {
     if (stage !== 'searching' || !matchmakingReady) return undefined;
 
-    setMatchmakingSeconds(15);
+    const deadline = matchmakingDeadlineRef.current || (Date.now() + 15000);
+    matchmakingDeadlineRef.current = deadline;
+
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setMatchmakingSeconds(remaining);
+
+      if (remaining === 0 && !botRequestTimerRef.current) {
+        const requestBotMatch = () => {
+          if (matchFoundRef.current) return;
+          socketRef.current?.emit('request_bot_matchmaking');
+        };
+        requestBotMatch();
+        botRequestTimerRef.current = setInterval(requestBotMatch, 2000);
+      }
+    };
+
+    updateCountdown();
     const timer = setInterval(() => {
-      setMatchmakingSeconds((seconds) => {
-        if (seconds <= 1) {
-          if (!botRequestTimerRef.current) {
-            const requestBotMatch = () => {
-              if (matchFoundRef.current) return;
-              socketRef.current?.emit('request_bot_matchmaking');
-            };
-            requestBotMatch();
-            botRequestTimerRef.current = setInterval(requestBotMatch, 2000);
-          }
-          return 0;
-        }
-        return seconds - 1;
-      });
+      updateCountdown();
     }, 1000);
 
     return () => {

@@ -1,0 +1,18 @@
+{
+  "name": "Rankex - Online Word Battle",
+  "short_name": "Rankex",
+  "description": "A free browser word battle and spelling game with practice matches, ranked duels, Gem rewards, and EXP progression.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080b10",
+  "theme_color": "#080b10",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/ZENTROVIK.png",
+      "sizes": "527x474",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

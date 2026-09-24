@@ -94,10 +94,20 @@ async function applyGemPenalty(room, userId, turnType, penaltyGems) {
 
   const penaltyValue = Number(penaltyGems) || 0
   const expiredPlayerId = String(userId).trim()
-  const participantIds = [expiredPlayerId]
+  const expiredPlayer = [room.p1, room.p2].find(
+    (player) => String(player?.id || '').trim() === expiredPlayerId
+  )
+  const opponentPlayer = [room.p1, room.p2].find(
+    (player) => String(player?.id || '').trim() !== expiredPlayerId
+  )
+
+  const isBotTimeout = expiredPlayerId === 'BOT_OPPONENT' || room.isBot && expiredPlayer?.id === 'BOT_OPPONENT'
+  const participantIds = isBotTimeout ? [] : [expiredPlayerId]
   const penaltyMap = {}
 
-  penaltyMap[expiredPlayerId] = penaltyValue
+  if (!isBotTimeout) {
+    penaltyMap[expiredPlayerId] = penaltyValue
+  }
 
   try {
     for (const participantId of participantIds) {
@@ -125,41 +135,63 @@ async function applyGemPenalty(room, userId, turnType, penaltyGems) {
       }
     }
 
+    const expiredUserId = String(expiredPlayer?.id || expiredPlayerId || '').trim()
+    const opponentUserId = String(opponentPlayer?.id || '').trim()
+
     const timeoutPayload = {
       roomId: room.roomId,
       turnType,
-      userId: String(userId).trim(),
-      penaltyGems: penaltyValue,
-      penalties: penaltyMap,
+      userId: expiredUserId,
+      expiredUserId: expiredUserId,
+      opponentUserId: opponentUserId,
+      isBotTimeout,
+      penaltyGems: isBotTimeout ? 0 : penaltyValue,
+      penalties: isBotTimeout ? {} : penaltyMap,
       secondsRemaining: 0,
       deadlineAt: room.turnDeadlineAt
     }
 
-    const expiredPlayer = [room.p1, room.p2].find(
-      (player) => String(player?.id || '').trim() === expiredPlayerId
-    )
-    const opponentPlayer = [room.p1, room.p2].find(
-      (player) => String(player?.id || '').trim() !== expiredPlayerId
-    )
+    const humanExpiredSocket = expiredPlayer?.socketId && expiredPlayer.id !== 'BOT_OPPONENT'
+      ? io.sockets.sockets.get(expiredPlayer.socketId)
+      : null
+    const humanOpponentSocket = opponentPlayer?.socketId && opponentPlayer.id !== 'BOT_OPPONENT'
+      ? io.sockets.sockets.get(opponentPlayer.socketId)
+      : null
 
-    const expiredSocket = io.sockets.sockets.get(expiredPlayer?.socketId)
-    const opponentSocket = io.sockets.sockets.get(opponentPlayer?.socketId)
+    const expiredMessage = isBotTimeout
+      ? 'TIME UP! The bot ran out of time. You did not lose Gems.'
+      : (turnType === 'challenge'
+        ? 'TIME UP! You lost 5 Gems because your 30s word selection timer expired.'
+        : 'TIME UP! You lost 10 Gems because your 30s answer timer expired.')
 
-    if (expiredSocket) {
-      expiredSocket.emit('turn_timeout', {
+    const waitingMessage = isBotTimeout
+      ? 'TIME UP! The bot ran out of time. You did not lose Gems.'
+      : (turnType === 'challenge'
+        ? 'PLEASE WAIT! Your opponent\'s 30s word selection timer expired. You did not lose Gems.'
+        : 'PLEASE WAIT! Your opponent\'s 30s answer timer expired. You did not lose Gems.')
+
+    if (isBotTimeout) {
+      if (humanOpponentSocket) {
+        humanOpponentSocket.emit('turn_timeout', {
+          ...timeoutPayload,
+          message: expiredMessage,
+          isBotTimeout: true
+        })
+      }
+      return
+    }
+
+    if (humanExpiredSocket) {
+      humanExpiredSocket.emit('turn_timeout', {
         ...timeoutPayload,
-        message: turnType === 'challenge'
-          ? 'TIME UP! You lost 5 Gems because your 30s word selection timer expired.'
-          : 'TIME UP! You lost 10 Gems because your 30s answer timer expired.'
+        message: expiredMessage
       })
     }
 
-    if (opponentSocket) {
-      opponentSocket.emit('turn_timeout', {
+    if (humanOpponentSocket) {
+      humanOpponentSocket.emit('turn_timeout', {
         ...timeoutPayload,
-        message: turnType === 'challenge'
-          ? 'PLEASE WAIT! Your opponent\'s 30s word selection timer expired. You did not lose Gems.'
-          : 'PLEASE WAIT! Your opponent\'s 30s answer timer expired. You did not lose Gems.'
+        message: waitingMessage
       })
     }
   } catch (err) {
@@ -217,19 +249,48 @@ try {
   console.warn('[Bot Data] Failed to load names.json, using fallback list:', err.message)
 }
 
-let botWordPool = [
+const FALLBACK_BOT_WORD_POOL = [
   'apple', 'beach', 'cloud', 'flame', 'grape', 'house', 'light', 'plant',
-  'river', 'space', 'tiger', 'water', 'earth', 'storm', 'stone', 'sword'
+  'river', 'space', 'tiger', 'water', 'earth', 'storm', 'stone', 'sword',
+  'forest', 'planet', 'garden', 'rocket', 'pencil', 'silver', 'signal', 'anchor',
+  'candle', 'window', 'sunrise', 'winter', 'summer', 'friend', 'school', 'pocket'
 ]
+
+function normalizeBotWord(rawWord) {
+  if (typeof rawWord !== 'string') return ''
+
+  const cleaned = rawWord.trim().toLowerCase().replace(/[^a-z]/g, '')
+  if (!cleaned) return ''
+
+  if (cleaned.length < 3 || cleaned.length > 8) return ''
+  if (cleaned === 'aids' || cleaned === 'dna' || cleaned === 'dvd' || cleaned === 'cpu' || cleaned === 'api') return ''
+
+  return cleaned
+}
+
+function buildBotWordPool(rawData) {
+  const seen = new Set()
+  const words = []
+
+  for (const entry of rawData || []) {
+    const candidate = typeof entry === 'string' ? entry : entry?.headword || entry?.word
+    const normalized = normalizeBotWord(candidate)
+
+    if (!normalized || seen.has(normalized)) continue
+
+    seen.add(normalized)
+    words.push(normalized)
+  }
+
+  return words.length > 0 ? words : [...FALLBACK_BOT_WORD_POOL]
+}
+
+let botWordPool = [...FALLBACK_BOT_WORD_POOL]
 try {
   if (fs.existsSync(DATASET_FILE_PATH)) {
     const rawData = JSON.parse(fs.readFileSync(DATASET_FILE_PATH, 'utf-8'))
     if (Array.isArray(rawData) && rawData.length > 0) {
-      const extracted = rawData
-        .map((entry) => (typeof entry === 'string' ? entry : entry.headword || entry.word))
-        .filter((w) => w && /^[a-zA-Z]{4,6}$/.test(w.trim()))
-        .map((w) => w.trim().toLowerCase())
-
+      const extracted = buildBotWordPool(rawData)
       if (extracted.length > 0) {
         botWordPool = extracted
       }

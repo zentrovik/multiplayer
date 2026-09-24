@@ -336,6 +336,29 @@
   font-family: 'Arial Black', 'Lilita One', system-ui, sans-serif;
 }
 
+.space-help-btn {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(180deg, #fef08a 0%, #facc15 60%, #eab308 100%);
+  border: 2px solid #0f172a;
+  border-radius: 50%;
+  color: #422006;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 #854d0e, 0 0 10px rgba(250, 204, 21, 0.32);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  line-height: 1;
+}
+
+.space-help-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 #854d0e;
+}
+
 /* ==========================================================================
    HERO / AVATAR STAGE
    ========================================================================== */
@@ -769,6 +792,152 @@
 
 .bug-report-send-btn {
   margin-top: 6px;
+}
+
+.rewards-guide-sheet {
+  max-width: 360px;
+  padding: 18px 14px 14px;
+  border-color: #0ea5e9;
+  background: linear-gradient(180deg, #102b43 0%, #071525 100%);
+}
+
+.rewards-guide-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 24px 14px 2px;
+  text-align: left;
+}
+
+.rewards-guide-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  color: #082f49;
+  background: linear-gradient(145deg, #67e8f9, #38bdf8);
+  box-shadow: 0 3px 0 #075985, 0 0 16px rgba(56, 189, 248, 0.38);
+  font-size: 20px;
+}
+
+.rewards-guide-heading h3 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+
+.rewards-guide-heading p {
+  margin: 2px 0 0;
+  color: #bae6fd;
+  font-family: system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rewards-guide-section {
+  padding: 10px;
+  border: 1px solid rgba(103, 232, 249, 0.35);
+  border-radius: 12px;
+  background: rgba(2, 12, 24, 0.58);
+  text-align: left;
+}
+
+.online-guide-section {
+  margin-top: 8px;
+  border-color: rgba(250, 204, 21, 0.35);
+}
+
+.rewards-guide-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 7px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+  color: #e0f2fe;
+  font-size: 11px;
+}
+
+.rewards-guide-section-title small {
+  margin-left: auto;
+  color: #94a3b8;
+  font-family: system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.rewards-guide-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+  color: #cbd5e1;
+  font-family: system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rewards-guide-row b {
+  color: #f8fafc;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rewards-guide-row .guide-positive { color: #86efac; }
+.rewards-guide-row .guide-gold { color: #fde047; }
+.rewards-guide-row .guide-negative { color: #fca5a5; }
+
+.rewards-guide-note {
+  margin: 5px 0 0;
+  color: #94a3b8;
+  font-family: system-ui, sans-serif;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.rewards-guide-note strong { color: #e0f2fe; }
+
+.rewards-guide-ranks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 10px;
+  color: #facc15;
+  font-family: system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.rewards-guide-ranks span {
+  width: 100%;
+  color: #7dd3fc;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
+.rewards-guide-ranks strong {
+  padding: 3px 5px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  border-radius: 5px;
+  background: rgba(250, 204, 21, 0.08);
+}
+
+@media (max-width: 370px) {
+  .rewards-guide-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .rewards-guide-row b {
+    text-align: left;
+  }
 }
 
 /* ==========================================================================

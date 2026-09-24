@@ -15,6 +15,7 @@ export default function TestMatch({ user, gameProfile, setGameProfile, wordBank 
   const [isEvaluating, setIsEvaluating] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [isVoicePlaying, setIsVoicePlaying] = useState(false)
+  const voiceTimerRef = useRef(null)
   const sessionRef = useRef({ storageKey: '', seenWords: new Set() })
 
   const userId = user?.uid || 'guest'
@@ -31,14 +32,32 @@ export default function TestMatch({ user, gameProfile, setGameProfile, wordBank 
 
   const triggerVoice = (slow = false) => {
     if (!currentWord) return
+
+    if (voiceTimerRef.current) {
+      window.clearTimeout(voiceTimerRef.current)
+    }
+
     setIsVoicePlaying(true)
-    playHDVoice(currentWord, slow)
-    setTimeout(() => setIsVoicePlaying(false), 1100)
+    const playback = playHDVoice(currentWord, slow, setIsVoicePlaying)
+
+    if (!playback.ok) {
+      setIsVoicePlaying(false)
+      return
+    }
+
+    voiceTimerRef.current = window.setTimeout(
+      () => setIsVoicePlaying(false),
+      slow ? 2600 : 1900
+    )
   }
+
+  useEffect(() => () => {
+    if (voiceTimerRef.current) window.clearTimeout(voiceTimerRef.current)
+  }, [])
 
   useEffect(() => {
     if (currentWord && !isCompleted) {
-      triggerVoice(false)
+      triggerVoice(true)
     }
   }, [currentIndex, currentWord, isCompleted])
 

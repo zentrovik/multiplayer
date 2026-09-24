@@ -12,7 +12,7 @@ export function createGameSocket() {
     transports: ['websocket', 'polling'],
     forceNew: true, // Forces a new connection per browser tab/component
     reconnection: true,
-    reconnectionAttempts: 6,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 4000,
     timeout: 10000,

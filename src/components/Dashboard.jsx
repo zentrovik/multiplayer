@@ -12,6 +12,7 @@ export default function Dashboard({ user, gameProfile, setGameProfile, onLogout 
   const [showGuestAlert, setShowGuestAlert] = useState(false)
   const [showAdModal, setShowAdModal] = useState(false)
   const [showBugReportModal, setShowBugReportModal] = useState(false)
+  const [showRewardsGuide, setShowRewardsGuide] = useState(false)
   const [inTestMatch, setInTestMatch] = useState(false)
   const [inBattleArena, setInBattleArena] = useState(false)
   const [inputName, setInputName] = useState('')
@@ -250,6 +251,15 @@ export default function Dashboard({ user, gameProfile, setGameProfile, onLogout 
               title="Bug Finder Reward"
             >
               <span className="space-bug-report-icon">?</span>
+            </button>
+            <button
+              type="button"
+              className="space-help-btn"
+              onClick={() => setShowRewardsGuide(true)}
+              title="How rewards work"
+              aria-label="How rewards work"
+            >
+              <span aria-hidden="true">i</span>
             </button>
           </div>
         </header>
@@ -606,6 +616,64 @@ export default function Dashboard({ user, gameProfile, setGameProfile, onLogout 
               >
                 SEND BUG REPORT
               </button>
+            </div>
+          </div>
+        )}
+
+        {showRewardsGuide && (
+          <div className="space-modal-overlay" onClick={() => setShowRewardsGuide(false)}>
+            <div
+              className="space-modal-sheet rewards-guide-sheet"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="rewards-guide-title"
+            >
+              <button
+                type="button"
+                onClick={() => setShowRewardsGuide(false)}
+                className="space-modal-close"
+                aria-label="Close rewards guide"
+              >
+                ✕
+              </button>
+
+              <div className="rewards-guide-heading">
+                <span className="rewards-guide-icon" aria-hidden="true">✦</span>
+                <div>
+                  <h3 id="rewards-guide-title">REWARDS GUIDE</h3>
+                  <p>How Gems, EXP, and ranks work</p>
+                </div>
+              </div>
+
+              <section className="rewards-guide-section">
+                <div className="rewards-guide-section-title">
+                  <span>🎧</span>
+                  <strong>TEST MATCH</strong>
+                  <small>4 words</small>
+                </div>
+                <div className="rewards-guide-row"><span>0-1 correct</span><b>+0 Gems · +0 EXP</b></div>
+                <div className="rewards-guide-row"><span>2-3 correct</span><b className="guide-positive">+1 Gem · +1 EXP</b></div>
+                <div className="rewards-guide-row"><span>4 correct</span><b className="guide-gold">+3 Gems · +2 EXP</b></div>
+                <p className="rewards-guide-note">Finish the test, then tap <strong>CLAIM &amp; RETURN</strong> to save the reward.</p>
+              </section>
+
+              <section className="rewards-guide-section online-guide-section">
+                <div className="rewards-guide-section-title">
+                  <span>⚔️</span>
+                  <strong>RANKED ONLINE</strong>
+                  <small>10 Gem wager</small>
+                </div>
+                <div className="rewards-guide-row"><span>Win</span><b className="guide-positive">+10 net Gems · +5 EXP</b></div>
+                <div className="rewards-guide-row"><span>Draw</span><b>10 Gems back · +5 EXP</b></div>
+                <div className="rewards-guide-row"><span>Lose</span><b className="guide-negative">-10 Gems · -5 EXP</b></div>
+                <p className="rewards-guide-note">The 10 Gems are locked to enter. A win pays 20 back, which is 10 Gems profit.</p>
+              </section>
+
+              <div className="rewards-guide-ranks">
+                <span>RANKS</span>
+                <strong>E 0</strong><strong>D 250</strong><strong>C 500</strong><strong>B 750</strong><strong>A 1,000</strong><strong>S 1,500</strong><strong>GOD 2,000 EXP</strong>
+              </div>
             </div>
           </div>
         )}
